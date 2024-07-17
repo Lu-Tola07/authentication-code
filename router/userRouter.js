@@ -2,8 +2,9 @@ const router = require("express").Router();
 const { createUser, verifyEmail, newEmail, logIn, updateUser, makeAdmin } = require("../controller/userController");
 const { authenticator } = require("../helpers/authentication");
 const { authorize, authorizeSuper } = require("../helpers/authorization");
+const uploader = require("../helpers/multer");
 
-router.post("/user", createUser);
+router.post("/user", uploader.single("profilePicture"), createUser);
 
 router.get("/verify/:id/:token", verifyEmail);
 

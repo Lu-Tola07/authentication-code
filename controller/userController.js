@@ -5,6 +5,8 @@ const html = require("../helpers/html")
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
 // const { link } = require("../router/userRouter");
+const cloudinary = require("../helpers/cloudinary");
+const fs = require("fs");
 
 exports.createUser = async (req, res) => {
     try {
@@ -19,23 +21,45 @@ exports.createUser = async (req, res) => {
 
         const hashedPassword = await bcrypt.hashSync(passWord, bcryptPassword);
 
+        const cloudProfile = await cloudinary.uploader.upload(req.file.path, {folder: "users dp"}, (err) => {
+            if(err) {
+                return res.status(400).json(err.message)
+            }
+        });
+
+        fs.unlink(req.file.path, (err) => {
+            if(err) {
+                console.log(err.message)
+            } else {
+                console.log(`File has been deleted successfully.`)
+            }
+        });
+ 
         const data = {
             firstName,
             lastName,
             email: email.toLowerCase(),
             passWord: hashedPassword,
-            phoneNumber};
+            phoneNumber,
+            profilePicture: {
+                pictureId: cloudProfile.public_id,
+                pictureUrl: cloudProfile.secure_url
+            }
+        };
+        // console.log("d")
 
         const createdUser = await userModel.create(data);
         const userToken = jwt.sign({id:createdUser._id, email:createdUser.email}, process.env.jwtSecret, {expiresIn: "3 minutes"});
         const verifyLink = `${req.protocol}://${req.get("host")}/api/v1/verify/${createdUser._id}/${userToken}`;
             // console.log(req.protocol)
+            // console.log("e")
         sendMail({
             subject: `Kindly verify your mail.`,
             email: createdUser.email,
             html: html(verifyLink, createdUser.firstName)
             // message: `Welcome ${createdUser.firstName} ${createdUser.lastName}, kindly click on the button to verify your account. ${verifyLink}`
         });
+        // console.log("a")
         
         res.status(201).json({
            message: `Welcome ${createdUser.firstName}, kindly check your gmail to access the link to verify your email.`,
@@ -45,8 +69,72 @@ exports.createUser = async (req, res) => {
         res.status(500).json({
             message: error.message
         })
+        // console.log("b")
     }
 };
+// console.log("c")
+
+// try {
+//     const { firstName, lastName, email, passWord, phoneNumber } = req.body;
+
+//     // Check if the email already exists in the database
+//     const checkIfAnEmailExist = await userModel.findOne({ email: email.toLowerCase() });
+//     if (checkIfAnEmailExist) {
+//         return res.status(400).json("User with this email already exists.");
+//     }
+
+//     // Generate hashed password
+//     const bcryptPassword = await bcrypt.genSaltSync(10);
+//     const hashedPassword = await bcrypt.hashSync(passWord, bcryptPassword);
+
+//     // Upload profile picture to Cloudinary
+//     const cloudProfile = await cloudinary.uploader.upload(req.file.path, { folder: "users dp" });
+
+//     // Create user data object
+//     const data = {
+//         firstName,
+//         lastName,
+//         email: email.toLowerCase(),
+//         passWord: hashedPassword,
+//         phoneNumber,
+//         profilePicture: {
+//             pictureId: cloudProfile.public_id,
+//             pictureUrl: cloudProfile.secure_url
+//         }
+//     };
+
+//     // Create user in database
+//     const createdUser = await userModel.create(data);
+
+//     // Generate JWT token for user
+//     const userToken = jwt.sign({ id: createdUser._id, email: createdUser.email }, process.env.jwtSecret, { expiresIn: "3 minutes" });
+
+//     // Construct verification link
+//     const verifyLink = `${req.protocol}://${req.get("host")}/api/v1/verify/${createdUser._id}/${userToken}`;
+
+//     // Send verification email with HTML content
+//     sendMail({
+//         subject: `Kindly verify your email.`,
+//         email: createdUser.email,
+//         html: html(verifyLink, createdUser.firstName)
+//     });
+
+//     // Respond with success message and created user data including token
+//     res.status(201).json({
+//         message: `Welcome ${createdUser.firstName}, please check your email (${createdUser.email}) to verify your email address.`,
+//         data: {
+//             user: createdUser,
+//             token: userToken
+//         }
+//     });
+
+// } catch (error) {
+//     // Handle errors
+//     res.status(500).json({
+//         message: error.message
+//     });
+// }
+// };
 
 
 // Create an endpoint to verify User email

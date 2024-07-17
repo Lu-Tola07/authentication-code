@@ -25,11 +25,15 @@ const userSchema = new mongoose.Schema({
         type: Boolean,
         default: false
     },
+    profilePicture: {
+        pictureUrl: String,
+        pictureId: String
+    },
     isVerified: {
         type: Boolean,
         default: false
     }
-}, {timestamps: true});
+}, {timestamp: true});
 
 const userModel= mongoose.model("userAuth", userSchema);
 
