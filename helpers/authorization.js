@@ -17,10 +17,10 @@ exports.authorize = async (req, res, next) => {
                 return res.status(400).json("Kindly login to perform this action.")
             }
 
-            req.user = user.firstName;
+            req.user = user._id;
         })
 
-        const checkUser = await userModel.findOne({firstName: req.user});
+        const checkUser = await userModel.findById(req.user);
         // console.log(checkUser);
         if(checkUser.isAdmin == false || checkUser.isSuperAdmin == false) {
             res.status(401).json("You are not allowed to perform this action.")
@@ -50,10 +50,10 @@ exports.authorizeSuper = async (req, res, next) => {
                 return res.status(400).json("Kindly login to perform this action.")
             }
 
-            req.user = user.firstName;
+            req.user = user._id;
         })
 
-        const checkUser = await userModel.findOne({firstName: req.user});
+        const checkUser = await userModel.findById(req.user);
         if(checkUser.isSuperAdmin == false) {
             res.status(401).json("You are not allowed to perform this action.")
         } else {

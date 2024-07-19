@@ -27,8 +27,15 @@ const userSchema = new mongoose.Schema({
     },
     profilePicture: {
         pictureUrl: String,
-        pictureId: String
+        pictureId: String,
+        // formerImages: [
+        //     {
+        //         pictureUrl: String,
+        //         pictureId: String
+        //     }
+        // ]
     },
+    previousProfilePictures: [String],
     isVerified: {
         type: Boolean,
         default: false

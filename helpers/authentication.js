@@ -15,7 +15,7 @@ exports.authenticator = async (req, res, next) => {
             if(err) {
                 return res.status(400).json("Kindly login to perform this action.")
             }
-            req.user = data.firstName
+            req.user = data._id
         });
 
         next();

@@ -7,6 +7,8 @@ const jwt = require("jsonwebtoken");
 // const { link } = require("../router/userRouter");
 const cloudinary = require("../helpers/cloudinary");
 const fs = require("fs");
+const path = require("path");
+const {promisify} = require("util");
 
 exports.createUser = async (req, res) => {
     try {
@@ -21,17 +23,13 @@ exports.createUser = async (req, res) => {
 
         const hashedPassword = await bcrypt.hashSync(passWord, bcryptPassword);
 
+        if(!req.file) {
+            return res.status(400).json("Kindly upload your profile picture.")
+        };
+
         const cloudProfile = await cloudinary.uploader.upload(req.file.path, {folder: "users dp"}, (err) => {
             if(err) {
                 return res.status(400).json(err.message)
-            }
-        });
-
-        fs.unlink(req.file.path, (err) => {
-            if(err) {
-                console.log(err.message)
-            } else {
-                console.log(`File has been deleted successfully.`)
             }
         });
  
@@ -47,8 +45,18 @@ exports.createUser = async (req, res) => {
             }
         };
         // console.log("d")
-
+        
         const createdUser = await userModel.create(data);
+
+        await fs.unlink(req.file.path, (err) => {
+            if(err) {
+                return res.status(400).json("Unable to delete user's file.")
+                console.log(err.message)
+            } else {
+                console.log(`File has been deleted successfully.`)
+            }
+        });
+
         const userToken = jwt.sign({id:createdUser._id, email:createdUser.email}, process.env.jwtSecret, {expiresIn: "3 minutes"});
         const verifyLink = `${req.protocol}://${req.get("host")}/api/v1/verify/${createdUser._id}/${userToken}`;
             // console.log(req.protocol)
@@ -216,7 +224,7 @@ exports.logIn = async (req, res) => {
         }
 
         const user = await jwt.sign({
-            firstName: findWithEmail.firstName, isAdmin: findWithEmail.isAdmin, isSuperAdmin: findWithEmail.isSuperAdmin},
+            id: findWithEmail._id, isAdmin: findWithEmail.isAdmin, isSuperAdmin: findWithEmail.isSuperAdmin},
             process.env.jwtSecret,
             {expiresIn: "2 Minutes"});
 
@@ -277,3 +285,249 @@ exports.makeAdmin = async (req, res) => {
         })
     }
 };
+
+// exports.updatePicture = async (req, res) => {
+//     try {
+//         const userToken = req.headers.authorization.split(" ")[1];
+//         const userId = userToken.id;
+//         if(!req.file) {
+//             return res.status(400).json("No profile picture selected.")
+//         };
+
+//         await jwt.verify(userToken, process.env.jwtSecret, async (err, newUser) => {
+//             if(err) {
+//                 return res.status(400).json("Unable to authenticate.")
+//             } else {
+//                 req.user = newUser.id
+
+//                 const cloudImage = await cloudinary.uploader.upload(req.file.path,
+//                     {folder: "User's dp"}, (err, data) => {
+//                     if(err) {
+//                         return res.status(400).json(err.message)
+//                     }
+//                 return data
+//             });
+
+//             const userId = newUser.id;
+//             // console.log(userId);
+
+//             const pictureUpdate = {profilePicture:{pictureId: cloudImage.public_id,
+//                 pictureUrl: cloudImage.secure_url}};
+
+//             const user = await userModel.findById(userId);
+//             const formerImageid = user.profilePicture.pictureId;
+//             await cloudinary.uploader.destroy(formerImageid);
+            
+//             const checkUser = await userModel.findByIdAndUpdate(userId, pictureUpdate, {new: true});
+//             await fs.unlink(req.file.path, (err) => {
+//                 if(err) {
+//                     return res.status(400).json("Unable to delete user's file.")
+//                     console.log(err.message)
+//                 } else {
+//                     console.log(`Updated file deleted successfully.`)
+//                 }
+//             });
+
+//         return res.status(200).json("User image has been changed successfully.");
+//         }})
+
+//     } catch (error) {
+//         res.status(500).json({
+//             message: error.message
+//         }) 
+//     }
+// };
+
+// exports.createMultiplePictures = async (req, res) => {
+//     try {
+//         const {userId} = req.body;
+//         // Ensure the request contains files
+//         if(!req.files || req.files.length === 0) {
+//             return res.status(400).json("No files uploaded.")
+//         };
+//         // Store the uploaded files
+//         const uploadedPictures = [];
+//         for (const file of req.files) {
+//             const result = await cloudinary.uploader.upload_stream({folder: 'usersPictures'}, (err, result) => {
+//                 if (err) {
+//                     throw new Error(error.message)
+//                 }
+//                 return result
+//             }).end(file.buffer)
+
+//             uploadedPictures.push({
+//                 pictureId: result.public_id,
+//                 pictureUrl: result.secure_url
+//             })
+//         };
+//         // Save picture data to your database
+//         const createdPictures = await pictureModel.create({
+//             userId,
+//             pictures: uploadedPictures
+//         });
+
+//         await fs.unlink(req.file.path, (err) => {
+//             if(err) {
+//                 return res.status(400).json("Unable to delete user's files.")
+//                 console.log(err.message)
+//             } else {
+//                 console.log(`Files successfully deleted.`)
+//             }
+//         });
+
+//         res.status(201).json({
+//             message: "Pictures uploaded successfully.",
+//             data: createdPictures
+//         });
+
+//     } catch (error) {
+//         res.status(500).json({
+//             message: error.message
+//         });
+//     }
+// };
+
+// 2nd Trial
+// exports.updatePicture = async (req, res) => {
+//     try {
+//         // Extract token from headers
+//         const userToken = req.headers.authorization.split(" ")[1];
+
+//         // Check if file is provided
+//         if (!req.file) {
+//             return res.status(400).json({ message: "No profile picture selected" });
+//         }
+
+//         // Verify token
+//         jwt.verify(userToken, process.env.jwtSecret, async (error, newUser) => {
+//             if (error) {
+//                 return res.status(400).json({ message: "Could not authenticate" });
+//             } else {
+//                 const userId = newUser.id;
+
+//                 // Find user to get the current profile picture
+//                 const user = await userModel.findById(userId);
+//                 if (!user) {
+//                     return res.status(404).json({ message: "User not found" });
+//                 }
+
+//                 // Save the current profile picture details
+//                 const formerImage = {
+//                     pictureId: user.profilePicture.pictureId,
+//                     pictureUrl: user.profilePicture.pictureUrl
+//                 };
+
+//                 // Upload new profile picture to Cloudinary
+//                 const cloudProfile = await cloudinary.uploader.upload(req.file.path, { folder: "users_dp" },{new:true});
+
+//                 // Prepare update data
+//                 const pictureUpdate = {
+//                     profilePicture: {
+//                         pictureId: cloudProfile.public_id,
+//                         pictureUrl: cloudProfile.secure_url,
+//                         formerImages: [...user.profilePicture.formerImages, formerImage] // Save old picture details
+//                     }
+//                 };
+
+//                 // Update user profile picture
+//                 const updatedUser = await userModel.findByIdAndUpdate(userId, pictureUpdate, { new: true });
+
+//                 //delete the picture from media folder
+//                 fileSystem.unlink(req.file.path,(error)=>{
+//                     if(error){
+//                         return res.status(400).json({
+//                             message:"unable to delete users profile picture",error
+//                         })            
+//                     }
+//                 });
+
+//                 // Return success response
+//                 return res.status(200).json({
+//                     message: "User image successfully changed",
+//                     data: updatedUser.profilePicture
+//                 });
+//             }
+//         });
+
+//     } catch (error) {
+//         res.status(500).json({
+//             message: error.message
+//         });
+//     }
+// };
+
+
+exports.updatePicture = async (req, res) => {
+    try {
+      const userToken = req.headers.authorization.split(" ").pop();
+  
+      if(!req.file || !req.file.path) {
+        return res.status(400).json({
+            error: "Picture has not been provided."
+        })
+      };
+      
+      const verifyToken = promisify(jwt.verify);
+      
+      let newUser;
+      try {
+        newUser = await verifyToken(userToken, process.env.jwtSecret);
+      } catch (err) {
+        return res.status(400).json({
+            error: err.message
+        })
+      };
+  
+      const userId = newUser.id;
+      
+      try {
+        const cloudImage = await cloudinary.uploader.upload(req.file.path,{folder: "updatedDp"});
+        const user = await userModel.findById(userId);
+
+        if(!user) {
+            return res.status(404).json({
+                error: "User not found."
+            })
+        };
+  
+        if(user.profilePicture && user.profilePicture.pictureUrl) {
+            if(!user.previousProfilePictures) {
+                user.previousProfilePictures = []
+            }
+            user.previousProfilePictures.push(user.profilePicture.pictureUrl)
+        };
+  
+        user.profilePicture = {
+          pictureId: cloudImage.public_id,
+          pictureUrl: cloudImage.secure_url,
+        };
+
+        fs.unlink(req.file.path, (err) => {
+          if(err) {
+            console.log(err.message)
+        } else {
+            ("Delete has been successful.")
+        }
+    });
+    
+        const updatedUser = await user.save();
+
+        const userName = newUser.firstName || "User";
+
+        return res.status(200).json({
+            message: `${userName}'s profile picture has been updated.`,
+            updatedUser
+        })
+    
+        } catch (uploadError) {
+            return res.status(400).json({
+                error: uploadError.message
+            })
+        }
+
+    } catch (error) {
+        res.status(500).json({
+            message: error.message
+        })
+    }
+  };
